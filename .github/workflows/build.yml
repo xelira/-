@@ -1,0 +1,84 @@
+name: build
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgl1-mesa-dev xorg-dev libxkbcommon-dev libwayland-dev wayland-protocols
+      - name: Build
+        run: |
+          VERSION="$(cat VERSION)"
+          mkdir -p dist
+          CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.Version=${VERSION}" -o dist/and ./cmd/and
+          tar -C dist -czf dist/and-linux-amd64.tar.gz and
+      - uses: actions/upload-artifact@v4
+        with:
+          name: and-linux
+          path: dist/and-linux-amd64.tar.gz
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install mingw
+        shell: pwsh
+        run: choco install mingw --no-progress -y
+      - name: Build
+        shell: pwsh
+        run: |
+          $env:CGO_ENABLED = "1"
+          $version = (Get-Content VERSION -Raw).Trim()
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -ldflags "-H windowsgui -s -w -X main.Version=$version" -o dist/and.exe ./cmd/and
+          Compress-Archive -Path dist/and.exe -DestinationPath dist/and-windows-amd64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: and-windows
+          path: dist/and-windows-amd64.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(cat VERSION)"
+          TAG="v${VERSION}"
+          NOTES="& ${VERSION}: один Go-бинарник. DPI + встроенный Go Telegram-прокси + Telegram Web."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "& ${VERSION}" --notes "$NOTES"
+          fi

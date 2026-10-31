@@ -1,0 +1,11 @@
+{
+  "id": "winws",
+  "version": "1.10.4140.82.121.3",
+  "platform": "windows",
+  "source": "https://github.com/Flowseal/zapret-discord-youtube",
+  "revision": "176f56dc3f11ce5915c26abcdde903f93d835b64",
+  "upstream": "https://github.com/bol-van/zapret",
+  "upstream_version": "v72.9",
+  "license": "MIT; WinDivert LGPL-3.0-or-later OR GPL-2.0",
+  "sha256": "affb4f69d2ea302a7abccd5325d81826e140ddae014f1e070bc4a6c0dd555188"
+}

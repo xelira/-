@@ -1,0 +1,6 @@
+/data/
+/dist/
+/and
+/and.exe
+*.test
+.DS_Store

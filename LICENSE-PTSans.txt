@@ -1,0 +1,4 @@
+PT Sans
+Copyright (c) 2009 ParaType Ltd.
+Free font, distributed under the ParaType Free Font License.
+https://www.paratype.com/help/license/

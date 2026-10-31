@@ -1,0 +1,15 @@
+web.telegram.org
+webk.telegram.org
+webz.telegram.org
+weba.telegram.org
+api.telegram.org
+telegram.org
+telegram.me
+t.me
+telegram.dog
+cdn-telegram.org
+telegram-cdn.org
+telesco.pe
+cdn.telesco.pe
+telegra.ph
+graph.org

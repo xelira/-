@@ -1,0 +1,9 @@
+{
+  "id": "nfqws",
+  "version": "v72.9",
+  "platform": "linux",
+  "source": "https://github.com/bol-van/zapret",
+  "upstream_version": "v72.9",
+  "license": "MIT",
+  "sha256": "e57db44af46835f68a8cacbf98267c694ee863e27622a8c3a3609eb14ebad11c"
+}
