@@ -1,4 +1,4 @@
-//go:build !linux && !windows
+//go:build !linux && !windows && !android
 
 package platform
 
@@ -12,3 +12,5 @@ func SystemHostsPath() string {
 }
 
 func FlushDNSCache() error { return nil }
+
+func HostsSupported() bool { return true }

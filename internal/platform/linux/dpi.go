@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && !android
 
 // Пакет linuxdpi — nftables + NFQUEUE/nfqws для Linux.
 package linuxdpi

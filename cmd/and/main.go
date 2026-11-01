@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -217,6 +217,7 @@ type ui struct {
 	guideBody    *widget.Label
 	guideNext    *widget.Button
 	guidePos     int
+	mobile       bool
 
 	listsDomains, listsIPs               *widget.Entry
 	listsDomainsBuiltin, listsIPsBuiltin *widget.Label
@@ -227,7 +228,9 @@ type ui struct {
 }
 
 func main() {
-	_ = os.Setenv("AND_FRAMELESS", "1")
+	if runtime.GOOS != "android" {
+		_ = os.Setenv("AND_FRAMELESS", "1")
+	}
 	hidden := false
 	for _, arg := range os.Args[1:] {
 		if arg == "--hidden" {
@@ -248,22 +251,11 @@ func main() {
 	u := &ui{app: a, m: m, profileBtns: map[string]*widget.Button{}, profileNames: map[string]string{}}
 	u.w = a.NewWindow("&")
 	u.w.SetIcon(appIcon())
-	u.w.Resize(fyne.NewSize(960, 680))
-	u.w.SetFixedSize(false)
-	u.w.SetPadded(false)
-	u.w.CenterOnScreen()
 	u.build()
-	u.w.SetCloseIntercept(func() {
-		m.Close()
-		a.Quit()
-	})
+	u.setupWindow()
 	u.w.Show()
-	if hidden {
-		if c := u.controls(); c != nil {
-			c.MinimizeWindow()
-		}
-	}
-	if u.firstRun() {
+	u.afterShow(hidden)
+	if u.firstRun() && !u.mobile {
 		fyne.Do(u.startTour)
 	}
 
@@ -279,38 +271,55 @@ func main() {
 }
 
 func (u *ui) build() {
-	// Sidebar
-	u.nav[0] = u.navButton("DPI", iconDPI, 0)
-	u.nav[1] = u.navButton("TELEGRAM", iconTelegram, 1)
-	u.nav[2] = u.navButton("WEB", iconWeb, 2)
-	u.nav[3] = u.navButton("СПИСКИ", iconLists, 3)
-	nav := container.NewVBox(u.nav[0], u.nav[1], u.nav[2], u.nav[3])
-	root := text("ROOT", 10, gray, false)
-	root.TextStyle.Monospace = true
-	help := widget.NewButtonWithIcon("", lightIcon(iconHelp), func() { u.startTour() })
-	help.Importance = widget.LowImportance
-	u.updateBtn = widget.NewButtonWithIcon("", lightIcon(iconRefresh), func() { go u.updateAction() })
-	u.updateBtn.Importance = widget.LowImportance
-	u.autostart = widget.NewButtonWithIcon("АВТОЗАПУСК", lightIcon(iconPower), func() { go u.toggleAutostart() })
-	u.autostart.Importance = widget.LowImportance
-	side := container.NewVBox(spacer(14), nav, layout.NewSpacer(), u.autostart, container.NewHBox(root, help, u.updateBtn))
-	sideBg := canvas.NewLinearGradient(surface, bg, 90)
-	sidePanel := container.NewStack(sideBg, container.NewPadded(side))
+	u.mobile = runtime.GOOS == "android"
+	titleSize := float32(28)
+	linkSize := float32(26)
+	if u.mobile {
+		titleSize = 24
+		linkSize = 18
+	}
 
-	// Header
-	u.title = text("DPI-ОБХОД", 28, white, true)
-	u.subtitle = text("NFTABLES / NFQUEUE", 10, gray, false)
+	// Header and common controls.
+	u.title = text("DPI-ОБХОД", titleSize, white, true)
+	subtitle := "NFTABLES / NFQUEUE"
+	if u.mobile {
+		subtitle = "VPN / BYEDPI"
+	}
+	u.subtitle = text(subtitle, 10, gray, false)
 	u.subtitle.TextStyle.Monospace = true
 	u.dpiStatus = newBadge("DPI", iconDPI)
 	u.tgStatus = newBadge("TG", iconTelegram)
 	u.webStatus = newBadge("WEB", iconWeb)
-	statuses := container.NewHBox(u.dpiStatus.object(), spacer(8), u.tgStatus.object(), spacer(8), u.webStatus.object())
-	header := container.NewBorder(nil, nil, container.NewVBox(u.title, u.subtitle), statuses, nil)
+	if u.mobile {
+		u.dpiStatus.compact = true
+		u.tgStatus.compact = true
+	}
+	var statuses fyne.CanvasObject
+	if u.mobile {
+		statuses = container.NewHBox(u.dpiStatus.object(), spacer(8), u.tgStatus.object())
+	} else {
+		statuses = container.NewHBox(u.dpiStatus.object(), spacer(8), u.tgStatus.object(), spacer(8), u.webStatus.object())
+	}
+	u.updateBtn = widget.NewButtonWithIcon("", lightIcon(iconRefresh), func() { go u.updateAction() })
+	u.updateBtn.Importance = widget.LowImportance
 
-	// DPI page
+	titleBox := container.NewVBox(u.title, u.subtitle)
+	var header fyne.CanvasObject
+	if u.mobile {
+		top := container.NewBorder(nil, nil, titleBox, u.updateBtn, nil)
+		header = container.NewVBox(top, spacer(6), statuses)
+	} else {
+		header = container.NewBorder(nil, nil, titleBox, statuses, nil)
+	}
+
+	// DPI page.
 	u.profileBox = container.NewVBox()
 	profileScroll := container.NewVScroll(u.profileBox)
-	profileScroll.SetMinSize(fyne.NewSize(0, 190))
+	if u.mobile {
+		profileScroll.SetMinSize(fyne.NewSize(0, 160))
+	} else {
+		profileScroll.SetMinSize(fyne.NewSize(0, 190))
+	}
 	u.startDPI = widget.NewButtonWithIcon("ВКЛЮЧИТЬ DPI", darkIcon(iconPlay), func() { go u.toggleDPI() })
 	u.startDPI.Importance = widget.HighImportance
 	apply := widget.NewButtonWithIcon("ПРИМЕНИТЬ", lightIcon(iconCheck), func() { go u.applyProfile() })
@@ -322,8 +331,8 @@ func (u *ui) build() {
 		profileScroll,
 	))
 
-	// Telegram page
-	u.link = text(proxyAddress(u.m), 26, white, true)
+	// Telegram page.
+	u.link = text(proxyAddress(u.m), linkSize, white, true)
 	u.link.TextStyle.Monospace = true
 	u.tgToggle = widget.NewButtonWithIcon("ВКЛЮЧИТЬ", darkIcon(iconTelegram), func() { go u.toggleProxy() })
 	u.tgToggle.Importance = widget.HighImportance
@@ -332,27 +341,45 @@ func (u *ui) build() {
 		dialog.ShowInformation("&", "Ссылка скопирована", u.w)
 	})
 	openBtn := widget.NewButtonWithIcon("ОТКРЫТЬ", lightIcon(iconOpen), func() { go u.openTelegram() })
+	tgActions := container.NewGridWithColumns(3, u.tgToggle, u.copyBtn, openBtn)
+	if u.mobile {
+		tgActions = container.NewVBox(u.tgToggle, u.copyBtn, openBtn)
+	}
 	u.pages[1] = card(container.NewBorder(
 		container.NewVBox(label("ЛОКАЛЬНЫЙ АДРЕС", true), separator()),
-		container.NewVBox(separator(), container.NewGridWithColumns(3, u.tgToggle, u.copyBtn, openBtn)),
+		container.NewVBox(separator(), tgActions),
 		nil, nil,
 		container.NewCenter(u.link),
 	))
 
-	// Web page
-	u.web = widget.NewButtonWithIcon("ИСПРАВИТЬ HOSTS", lightIcon(iconWeb), func() { go u.toggleWeb() })
-	u.web.Importance = widget.MediumImportance
-	u.pages[2] = card(container.NewBorder(
-		container.NewVBox(label("АВТОМАТИЧЕСКИ", true), separator()),
-		nil, nil, nil,
-		container.NewVBox(
-			text("Проверка hosts при запуске и откат при выходе.", 14, gray, false),
-			spacer(12),
-			u.web,
-		),
-	))
+	// Web / hosts page.
+	if platform.HostsSupported() {
+		u.web = widget.NewButtonWithIcon("ИСПРАВИТЬ HOSTS", lightIcon(iconWeb), func() { go u.toggleWeb() })
+		u.web.Importance = widget.MediumImportance
+		u.pages[2] = card(container.NewBorder(
+			container.NewVBox(label("АВТОМАТИЧЕСКИ", true), separator()),
+			nil, nil, nil,
+			container.NewVBox(
+				text("Проверка hosts при запуске и откат при выходе.", 14, gray, false),
+				spacer(12),
+				u.web,
+			),
+		))
+	} else {
+		openWeb := widget.NewButtonWithIcon("ОТКРЫТЬ WEB.TELEGRAM.ORG", lightIcon(iconOpen), func() { u.done(u.m.OpenTelegramWeb()) })
+		openWeb.Importance = widget.MediumImportance
+		notice := widget.NewLabel("На Android системный файл hosts недоступен без root. Для Telegram используйте встроенный MTProto-прокси; веб-версия откроется в браузере.")
+		notice.Wrapping = fyne.TextWrapWord
+		notice.SizeName = theme.SizeNameCaptionText
+		notice.Importance = widget.LowImportance
+		u.pages[2] = card(container.NewBorder(
+			container.NewVBox(label("ANDROID", true), separator()),
+			nil, nil, nil,
+			container.NewVBox(notice, spacer(12), openWeb),
+		))
+	}
 
-	// Lists page
+	// Lists page.
 	listsView := u.m.CustomLists()
 	u.listsDomainsBuiltin = listLabel(strings.Join(listsView.BuiltinDomains, "\n"))
 	u.listsIPsBuiltin = listLabel(strings.Join(listsView.BuiltinIPs, "\n"))
@@ -374,179 +401,48 @@ func (u *ui) build() {
 	hint.Wrapping = fyne.TextWrapWord
 	hint.SizeName = theme.SizeNameCaptionText
 	hint.Importance = widget.LowImportance
+	builtinDomains := listSection("ВСТРОЕННЫЕ ДОМЕНЫ", text(fmt.Sprintf("%d", len(listsView.BuiltinDomains)), 10, dim, true))
+	builtinIPs := listSection("ВСТРОЕННЫЕ IP / CIDR", text(fmt.Sprintf("%d", len(listsView.BuiltinIPs)), 10, dim, true))
 	left := container.NewVBox(
-		listSection("ВСТРОЕННЫЕ ДОМЕНЫ", text(fmt.Sprintf("%d", len(listsView.BuiltinDomains)), 10, dim, true)),
+		builtinDomains,
 		listBox(u.listsDomainsBuiltin),
 		spacer(4),
 		listSection("СВОИ ДОМЕНЫ", u.listsDomainsCount),
 		u.listsDomains,
 	)
 	right := container.NewVBox(
-		listSection("ВСТРОЕННЫЕ IP / CIDR", text(fmt.Sprintf("%d", len(listsView.BuiltinIPs)), 10, dim, true)),
+		builtinIPs,
 		listBox(u.listsIPsBuiltin),
 		spacer(4),
 		listSection("СВОИ IP / CIDR", u.listsIPsCount),
 		u.listsIPs,
 	)
-	u.pages[3] = card(container.NewBorder(
-		container.NewVBox(hint, spacer(6)),
-		container.NewVBox(separator(), container.NewBorder(nil, nil, saveLists, nil,
-			label("ВСТРОЕННЫЕ: list-general-user.txt · ip-list.default", true))),
-		nil, nil,
-		container.NewGridWithColumns(2, left, right)))
+	if u.mobile {
+		body := container.NewVScroll(container.NewVBox(left, spacer(12), right))
+		u.pages[3] = card(container.NewBorder(
+			container.NewVBox(hint, spacer(6)),
+			container.NewVBox(separator(), saveLists),
+			nil, nil, body))
+	} else {
+		u.pages[3] = card(container.NewBorder(
+			container.NewVBox(hint, spacer(6)),
+			container.NewVBox(separator(), container.NewBorder(nil, nil, saveLists, nil,
+				label("ВСТРОЕННЫЕ: list-general-user.txt · ip-list.default", true))),
+			nil, nil,
+			container.NewGridWithColumns(2, left, right)))
+	}
 
 	u.buildGuide()
 	u.loadProfiles()
+	u.main = widget.NewButtonWithIcon("ВКЛЮЧИТЬ ВСЁ", darkIcon(iconPlay), func() { go u.toggleAll() })
+	u.main.Importance = widget.HighImportance
+	pageStack := container.NewStack(u.pages[0], u.pages[1], u.pages[2], u.pages[3])
+	u.assemble(header, pageStack, u.main)
 	u.showTab(0)
 	go func() {
 		time.Sleep(2 * time.Second)
 		u.checkUpdates(true)
 	}()
-
-	u.main = widget.NewButtonWithIcon("ВКЛЮЧИТЬ ВСЁ", darkIcon(iconPlay), func() { go u.toggleAll() })
-	u.main.Importance = widget.HighImportance
-	pageStack := container.NewStack(u.pages[0], u.pages[1], u.pages[2], u.pages[3])
-	center := container.NewBorder(u.guidePanel, nil, nil, nil, pageStack)
-	grip := &resizeGrip{onDrag: u.resizeWindow}
-	bottom := container.NewBorder(nil, nil, nil, grip, u.main)
-	main := container.NewBorder(header, container.NewVBox(separator(), bottom), nil, nil, center)
-
-	split := container.NewHSplit(sidePanel, container.NewPadded(main))
-	split.SetOffset(0.22)
-	rootBg := canvas.NewLinearGradient(bgTop, bg, 90)
-	bar := u.titleBar()
-	rootShell := container.NewBorder(bar, nil, nil, nil, container.NewStack(rootBg, split))
-	u.w.SetContent(rootShell)
-}
-
-type windowControls interface {
-	MinimizeWindow()
-	MaximizeWindow()
-	MoveWindow(int, int)
-	StartWindowDrag()
-	DragWindowToCursor()
-	EndWindowDrag()
-}
-
-type dragBar struct {
-	widget.BaseWidget
-	onStart func()
-	onMove  func()
-	onEnd   func()
-	started bool
-	accum   float32
-}
-
-func (d *dragBar) CreateRenderer() fyne.WidgetRenderer {
-	mark := text("&", 22, white, true)
-	name := text("AMPERSAND", 11, white, true)
-	ver := text("2.0.0", 9, gray, false)
-	ver.TextStyle.Monospace = true
-	return widget.NewSimpleRenderer(container.NewHBox(mark, spacer(8), name, spacer(6), ver))
-}
-
-func (d *dragBar) MinSize() fyne.Size { return fyne.NewSize(240, 40) }
-
-func (d *dragBar) Dragged(e *fyne.DragEvent) {
-	if !d.started {
-		d.accum += float32(abs(e.Dragged.DX)) + float32(abs(e.Dragged.DY))
-		if d.accum < 4 {
-			return
-		}
-		d.started = true
-		if d.onStart != nil {
-			d.onStart()
-		}
-	}
-	if d.onMove != nil {
-		d.onMove()
-	}
-}
-func (d *dragBar) DragEnd() {
-	d.started = false
-	d.accum = 0
-	if d.onEnd != nil {
-		d.onEnd()
-	}
-}
-
-func abs(v float32) float32 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
-type resizeGrip struct {
-	widget.BaseWidget
-	onDrag func(float32, float32)
-}
-
-func (g *resizeGrip) CreateRenderer() fyne.WidgetRenderer {
-	img := canvas.NewImageFromResource(lightIcon(iconGrip))
-	img.FillMode = canvas.ImageFillContain
-	img.SetMinSize(fyne.NewSize(18, 18))
-	return widget.NewSimpleRenderer(img)
-}
-
-func (g *resizeGrip) MinSize() fyne.Size { return fyne.NewSize(22, 22) }
-func (g *resizeGrip) Dragged(e *fyne.DragEvent) {
-	if g.onDrag != nil {
-		g.onDrag(e.Dragged.DX, e.Dragged.DY)
-	}
-}
-func (g *resizeGrip) DragEnd() {}
-
-func (u *ui) controls() windowControls {
-	c, _ := u.w.(windowControls)
-	return c
-}
-
-func (u *ui) startWindowDrag() {
-	if c := u.controls(); c != nil {
-		c.StartWindowDrag()
-	}
-}
-
-func (u *ui) dragWindow() {
-	if c := u.controls(); c != nil {
-		c.DragWindowToCursor()
-	}
-}
-
-func (u *ui) endWindowDrag() {
-	if c := u.controls(); c != nil {
-		c.EndWindowDrag()
-	}
-}
-
-func (u *ui) resizeWindow(dx, dy float32) {
-	size := u.w.Canvas().Size()
-	u.w.Resize(fyne.NewSize(size.Width+dx, size.Height+dy))
-}
-
-func (u *ui) titleBar() fyne.CanvasObject {
-	drag := &dragBar{onStart: u.startWindowDrag, onMove: u.dragWindow, onEnd: u.endWindowDrag}
-	min := widget.NewButtonWithIcon("", lightIcon(iconMinimize), func() {
-		if c := u.controls(); c != nil {
-			c.MinimizeWindow()
-		}
-	})
-	max := widget.NewButtonWithIcon("", lightIcon(iconMaximize), func() {
-		if c := u.controls(); c != nil {
-			c.MaximizeWindow()
-		}
-	})
-	closeBtn := widget.NewButtonWithIcon("", lightIcon(iconClose), func() { u.w.Close() })
-	for _, b := range []*widget.Button{min, max, closeBtn} {
-		b.Importance = widget.LowImportance
-	}
-	controls := container.NewHBox(min, max, closeBtn)
-	row := container.NewBorder(nil, nil, nil, controls, drag)
-	bg := canvas.NewRectangle(surface)
-	bg.StrokeColor = line
-	bg.StrokeWidth = 1
-	return container.NewStack(bg, container.NewPadded(row))
 }
 
 func listLabel(value string) *widget.Label {
@@ -832,28 +728,35 @@ func (u *ui) refresh() {
 		}
 	}
 	u.main.Refresh()
-	if st.Settings.Autostart {
-		u.autostart.SetText("АВТОЗАПУСК ВКЛ")
-		u.autostart.Icon = lightIcon(iconCheck)
-	} else {
-		u.autostart.SetText("АВТОЗАПУСК")
-		u.autostart.Icon = lightIcon(iconPower)
+	if u.autostart != nil {
+		if st.Settings.Autostart {
+			u.autostart.SetText("АВТОЗАПУСК ВКЛ")
+			u.autostart.Icon = lightIcon(iconCheck)
+		} else {
+			u.autostart.SetText("АВТОЗАПУСК")
+			u.autostart.Icon = lightIcon(iconPower)
+		}
+		u.autostart.Refresh()
 	}
-	u.autostart.Refresh()
-	if st.TelegramWeb.Applied {
-		u.web.SetText("ВЕРНУТЬ HOSTS")
-		u.web.Icon = lightIcon(iconCheck)
-	} else {
-		u.web.SetText("ИСПРАВИТЬ HOSTS")
-		u.web.Icon = lightIcon(iconWeb)
+	if u.web != nil {
+		if st.TelegramWeb.Applied {
+			u.web.SetText("ВЕРНУТЬ HOSTS")
+			u.web.Icon = lightIcon(iconCheck)
+		} else {
+			u.web.SetText("ИСПРАВИТЬ HOSTS")
+			u.web.Icon = lightIcon(iconWeb)
+		}
+		u.web.Refresh()
 	}
-	u.web.Refresh()
 }
 
 func (u *ui) showTab(i int) {
 	u.active = i
 	titles := []string{"DPI-ОБХОД", "TELEGRAM-ПРОКСИ", "TELEGRAM WEB", "СПИСКИ"}
 	subs := []string{"NFTABLES / NFQUEUE", "MTPROTO / WEBSOCKET", "СИСТЕМНЫЙ HOSTS", "ДОМЕНЫ И IP / CIDR"}
+	if u.mobile {
+		subs = []string{"VPN / BYEDPI", "MTPROTO / WEBSOCKET", "БЕЗ HOSTS", "ДОМЕНЫ И IP / CIDR"}
+	}
 	u.title.Text = titles[i]
 	u.subtitle.Text = subs[i]
 	u.title.Refresh()
@@ -883,6 +786,9 @@ func (u *ui) navButton(name string, base fyne.Resource, index int) *widget.Butto
 func (u *ui) toggleAll() { u.done(u.m.Toggle()) }
 
 func (u *ui) toggleAutostart() {
+	if u.autostart == nil {
+		return
+	}
 	st := u.m.GetState()
 	s := st.Settings
 	s.Autostart = !s.Autostart
@@ -918,6 +824,9 @@ func (u *ui) applyProfile() {
 }
 
 func (u *ui) toggleWeb() {
+	if u.web == nil {
+		return
+	}
 	if u.m.TelegramWebStatus().Applied {
 		u.done(u.m.RevertTelegramWebFix())
 		return
@@ -978,10 +887,11 @@ func label(s string, mono bool) *canvas.Text {
 }
 
 type badge struct {
-	rect  *canvas.Rectangle
-	label *canvas.Text
-	icon  *canvas.Image
-	base  fyne.Resource
+	rect    *canvas.Rectangle
+	label   *canvas.Text
+	icon    *canvas.Image
+	base    fyne.Resource
+	compact bool
 }
 
 func newBadge(name string, base fyne.Resource) *badge {
@@ -1015,6 +925,9 @@ func (b *badge) set(name string, on bool) {
 		b.label.Text = name + " ВЫКЛ"
 		b.label.Color = dim
 		b.icon.Resource = dimIcon(b.base)
+	}
+	if b.compact {
+		b.label.Text = name
 	}
 	b.rect.Refresh()
 	b.label.Refresh()

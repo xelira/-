@@ -4,3 +4,25 @@
 /and.exe
 *.test
 .DS_Store
+
+# Android / local mobile toolchain
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/android/keystore.properties
+/android/app/src/main/jniLibs/
+/android/app/src/main/jni/**/*.o
+/android/app/src/main/jni/**/*.a
+/android/captures/
+/.idea/
+*.iml
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+/android/.kotlin/
+/android/app/.cxx/
+/android/app/.externalNativeBuild/
+/android/app/release/

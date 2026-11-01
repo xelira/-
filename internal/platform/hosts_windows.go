@@ -26,3 +26,5 @@ func FlushDNSCache() error {
 	_ = cmd.Run()
 	return nil
 }
+
+func HostsSupported() bool { return true }

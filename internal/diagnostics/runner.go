@@ -82,7 +82,9 @@ func (r *Runner) RunComponents(ctx context.Context) []Record {
 	if r.DPI != nil {
 		probe := r.DPI.Probe(ctx)
 		add(LevelComponents, "dpi", probe.Platform+" engine", probe.EnginePresent && probe.EngineIntact, probe.EngineVersion+" "+probe.EnginePath, strings.Join(probe.Problems, "; "))
-		if probe.Privileged {
+		if probe.Platform == "android" {
+			add(LevelComponents, "dpi", "Android VpnService", true, "ByeDPI, root не требуется", "")
+		} else if probe.Privileged {
 			add(LevelComponents, "dpi", "Привилегии DPI", true, privilegeDetail(true), "")
 		} else {
 			res := ResultSkipped

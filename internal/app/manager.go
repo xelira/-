@@ -116,7 +116,7 @@ func NewManager(version string, autoStart bool) (*Manager, error) {
 	// ничего само не запускаем: человек сначала должен нажать «Ну и че».
 	m.vpnStatus()
 	cfg := store.Snapshot()
-	if autoStart && cfg.TelegramWeb.AutoFix {
+	if autoStart && cfg.TelegramWeb.AutoFix && platform.HostsSupported() {
 		m.startTelegramWebAutoFix()
 	}
 	if autoStart && !m.vpnStatus().Active {
@@ -314,15 +314,15 @@ func (m *Manager) state() State {
 		PreviousProfile:   cfg.DPI.PreviousProfile,
 		LastCheck:         cfg.Diagnostics.LastCheck,
 		Privilege: PrivilegeState{
-			Elevated: probe.Privileged,
-			Required: true,
+			Elevated: probe.Privileged || runtime.GOOS == "android",
+			Required: runtime.GOOS != "android",
 			Platform: probe.Platform,
 			Guidance: guidance,
 		},
 		Busy:          busy,
 		SetupComplete: cfg.SetupComplete,
 		VPN:           vpnState,
-		TelegramWeb:   telegramWebState(m.telegramWeb.Status()),
+		TelegramWeb:   m.TelegramWebStatus(),
 		Settings:      settingsFromConfig(cfg),
 	}
 	return state
@@ -369,6 +369,9 @@ func privilegeGuidance() string {
 	}
 	if runtime.GOOS == "linux" {
 		return "Для DPI нужны root/nftables. Запустите приложение через sudo или настройте разрешение pkexec; прокси работает без root."
+	}
+	if runtime.GOOS == "android" {
+		return "DPI работает через Android VpnService и ByeDPI. Root не нужен; при первом запуске разрешите VPN."
 	}
 	return "DPI не поддерживается на этой платформе."
 }
@@ -429,6 +432,7 @@ func (m *Manager) StartProxy() ActionResult {
 		return ActionResult{OK: false, Message: withReport("Telegram Proxy: "+err.Error(), report), State: m.state()}
 	}
 	m.setProxyError("")
+	_ = platform.KeepAlive(true)
 	m.emitState()
 	return ActionResult{OK: true, Message: "Telegram Proxy запущен и слушает локальный порт", State: m.state()}
 }
@@ -446,6 +450,7 @@ func (m *Manager) StopProxy() ActionResult {
 		return ActionResult{OK: false, Message: err.Error(), State: m.state()}
 	}
 	m.setProxyError("")
+	_ = platform.KeepAlive(false)
 	m.emitState()
 	return ActionResult{OK: true, Message: "Telegram Proxy остановлен", State: m.state()}
 }
@@ -465,6 +470,7 @@ func (m *Manager) Toggle() ActionResult {
 				m.setProxyError(err.Error())
 			} else {
 				m.setProxyError("")
+				_ = platform.KeepAlive(false)
 				msgs = append(msgs, "Telegram Proxy остановлен")
 			}
 		}

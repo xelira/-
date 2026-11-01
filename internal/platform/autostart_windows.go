@@ -59,3 +59,5 @@ func SetAutostart(enabled bool) error {
 func escapeXML(s string) string {
 	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }
+
+func AutostartSupported() bool { return true }

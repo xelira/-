@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && !android
 
 package platform
 
@@ -78,3 +78,5 @@ func autostartUser() (int, int, string) {
 	}
 	return 0, 0, ""
 }
+
+func AutostartSupported() bool { return true }

@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && !android
 
 package platform
 
@@ -29,3 +29,5 @@ func FlushDNSCache() error {
 	}
 	return nil
 }
+
+func HostsSupported() bool { return true }

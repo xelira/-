@@ -1,0 +1,3 @@
+-keep class org.golang.app.** { *; }
+-keep class com.and.app.** { *; }
+-keep class hev.htproxy.** { *; }

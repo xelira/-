@@ -33,6 +33,7 @@ type Profile struct {
 	Ports       Ports                `json:"ports"`
 	Windows     PlatformArgs         `json:"windows"`
 	Linux       PlatformArgs         `json:"linux"`
+	Android     PlatformArgs         `json:"android"`
 	Source      Source               `json:"source"`
 }
 
@@ -115,7 +116,7 @@ func (p Profile) Validate() error {
 		return fmt.Errorf("%w: %s has no platforms", ErrInvalidProfile, p.ID)
 	}
 	for _, platform := range p.Platforms {
-		if platform != "windows" && platform != "linux" {
+		if platform != "windows" && platform != "linux" && platform != "android" {
 			return fmt.Errorf("%w: %s has unknown platform %q", ErrInvalidProfile, p.ID, platform)
 		}
 		ref, ok := p.Engines[platform]
@@ -127,6 +128,12 @@ func (p Profile) Validate() error {
 			return fmt.Errorf("%w: %s has no arguments for %s", ErrInvalidProfile, p.ID, platform)
 		}
 		for _, arg := range args.Args {
+			if platform == "android" {
+				if arg == "" || strings.ContainsAny(arg, "\x00\r\n") {
+					return fmt.Errorf("%w: %s/android: bad argument %q", ErrInvalidProfile, p.ID, arg)
+				}
+				continue
+			}
 			if err := validateArg(arg); err != nil {
 				return fmt.Errorf("%w: %s/%s: %v", ErrInvalidProfile, p.ID, platform, err)
 			}
@@ -167,6 +174,8 @@ func (p Profile) ArgsFor(goos string) PlatformArgs {
 		return p.Windows
 	case "linux":
 		return p.Linux
+	case "android":
+		return p.Android
 	default:
 		return PlatformArgs{}
 	}

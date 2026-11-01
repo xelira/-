@@ -8,3 +8,9 @@ internal/assets/files/engines/linux/nfqws binary
 
 *.ico binary
 *.syso binary
+*.so binary
+*.aar binary
+*.apk binary
+*.aab binary
+*.jks binary
+*.keystore binary

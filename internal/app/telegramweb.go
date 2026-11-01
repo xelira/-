@@ -12,6 +12,9 @@ import (
 // TelegramWebStatus отдаёт дешёвый снимок: применён ли hosts и что было
 // найдено при последней проверке. Сетевые запросы здесь не выполняются.
 func (m *Manager) TelegramWebStatus() TelegramWebState {
+	if !platform.HostsSupported() {
+		return TelegramWebState{Supported: false, Detail: "На Android системный hosts недоступен. Используйте Telegram-прокси."}
+	}
 	if m.telegramWeb == nil {
 		return TelegramWebState{Detail: "Telegram Web hosts недоступен"}
 	}
@@ -20,6 +23,9 @@ func (m *Manager) TelegramWebStatus() TelegramWebState {
 
 // CheckTelegramWeb проверяет DNS, страницу /a/ и WebSocket kws2-1.
 func (m *Manager) CheckTelegramWeb() TelegramWebState {
+	if !platform.HostsSupported() {
+		return TelegramWebState{Supported: false, Detail: "На Android системный hosts недоступен."}
+	}
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
 	if m.telegramWeb == nil {
@@ -34,6 +40,9 @@ func (m *Manager) CheckTelegramWeb() TelegramWebState {
 
 // ApplyTelegramWebFix подбирает рабочий IP и добавляет управляемый блок в hosts.
 func (m *Manager) ApplyTelegramWebFix() ActionResult {
+	if !platform.HostsSupported() {
+		return ActionResult{OK: false, Message: "На Android системный hosts недоступен. Используйте Telegram-прокси.", State: m.state()}
+	}
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
 	if m.telegramWeb == nil {
@@ -63,6 +72,9 @@ func (m *Manager) ApplyTelegramWebFix() ActionResult {
 // RevertTelegramWebFix удаляет только блок приложения и восстанавливает
 // строки hosts, которые были убраны при исправлении.
 func (m *Manager) RevertTelegramWebFix() ActionResult {
+	if !platform.HostsSupported() {
+		return ActionResult{OK: false, Message: "На Android системный hosts недоступен.", State: m.state()}
+	}
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
 	m.setBusy(true)
@@ -86,7 +98,7 @@ func (m *Manager) telegramWebAutoMarker() string {
 // возвращается обратно. Если приложение запущено без root, фикс просто не
 // применяется — никаких запросов пароля из этой функции нет.
 func (m *Manager) startTelegramWebAutoFix() {
-	if m.telegramWeb == nil {
+	if !platform.HostsSupported() || m.telegramWeb == nil {
 		return
 	}
 	go func() {
