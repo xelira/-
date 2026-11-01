@@ -7,7 +7,7 @@ MOBILE_DEV_ROOT="${MOBILE_DEV_ROOT:-/mnt/storage/mobile-dev}"
 # The repository directory contains '&', which ndk-build/make treats as a shell
 # separator. Build from a clean mirror path without special characters.
 MIRROR="${AND_ANDROID_MIRROR:-$MOBILE_DEV_ROOT/and-build}"
-VERSION="${AND_VERSION:-2.0.0}"
+VERSION="${AND_VERSION:-$(cat "$ROOT/VERSION")}"
 NDK_VERSION="${AND_NDK_VERSION:-27.2.12479018}"
 
 if [[ -f "$MOBILE_DEV_ROOT/env.sh" ]]; then

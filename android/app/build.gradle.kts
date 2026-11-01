@@ -19,8 +19,8 @@ android {
         applicationId = "com.and.network"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20000
-        versionName = "2.0.0"
+        versionCode = 20100
+        versionName = "2.1.0"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }

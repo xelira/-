@@ -43,7 +43,7 @@ source /mnt/storage/mobile-dev/env.sh
 2. собирает `liband.so` для `arm64-v8a`, `armeabi-v7a`, `x86_64`;
 3. собирает `libbyedpi.so` через NDK;
 4. собирает подписанный APK;
-5. кладёт его в `dist/and-2.0.0.apk` и `/mnt/storage/mobile-dev/artifacts/`.
+5. кладёт его в `dist/and-2.1.0.apk` и `/mnt/storage/mobile-dev/artifacts/`.
 
 Нужны JDK 21, Android SDK 36, NDK 27.2.12479018, Gradle 8.14.3.
 Пути задаются в `/mnt/storage/mobile-dev/env.sh`.
