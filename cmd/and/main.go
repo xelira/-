@@ -292,7 +292,7 @@ func (u *ui) build() {
 	u.updateBtn.Importance = widget.LowImportance
 	u.autostart = widget.NewButtonWithIcon("АВТОЗАПУСК", lightIcon(iconPower), func() { go u.toggleAutostart() })
 	u.autostart.Importance = widget.LowImportance
-	side := container.NewVBox(spacer(14), nav, spacer(10), u.autostart, layout.NewSpacer(), container.NewHBox(root, help, u.updateBtn))
+	side := container.NewVBox(spacer(14), nav, layout.NewSpacer(), u.autostart, container.NewHBox(root, help, u.updateBtn))
 	sideBg := canvas.NewLinearGradient(surface, bg, 90)
 	sidePanel := container.NewStack(sideBg, container.NewPadded(side))
 
