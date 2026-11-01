@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 
 	andapp "ampersand/internal/app"
 	"ampersand/internal/platform"
+	"ampersand/internal/update"
 )
 
 var Version = "2.0.0"
@@ -30,6 +32,13 @@ var fontFS embed.FS
 
 //go:embed icons/*.svg
 var iconFS embed.FS
+
+//go:embed icon/icon.png
+var appIconPNG []byte
+
+func appIcon() fyne.Resource {
+	return fyne.NewStaticResource("and-icon.png", appIconPNG)
+}
 
 var (
 	fontRegular = mustFont("fonts/PTSans-Regular.ttf")
@@ -67,6 +76,8 @@ var (
 	iconMaximize = mustIcon("maximize.svg")
 	iconClose    = mustIcon("close.svg")
 	iconGrip     = mustIcon("grip.svg")
+	iconLists    = mustIcon("lists.svg")
+	iconRefresh  = mustIcon("refresh.svg")
 )
 
 func lightIcon(base fyne.Resource) fyne.Resource {
@@ -186,9 +197,9 @@ type ui struct {
 	title, subtitle                *canvas.Text
 	dpiStatus, tgStatus, webStatus *badge
 	main, web                      *widget.Button
-	nav                            [3]*widget.Button
-	navIcons                       [3]fyne.Resource
-	pages                          [3]fyne.CanvasObject
+	nav                            [4]*widget.Button
+	navIcons                       [4]fyne.Resource
+	pages                          [4]fyne.CanvasObject
 	active                         int
 
 	profileBox   *fyne.Container
@@ -205,12 +216,18 @@ type ui struct {
 	guideBody    *widget.Label
 	guideNext    *widget.Button
 	guidePos     int
+
+	listsDomains, listsIPs               *widget.Entry
+	listsDomainsBuiltin, listsIPsBuiltin *widget.Label
+	updateBtn                            *widget.Button
+	updateURL                            string
 }
 
 func main() {
 	_ = os.Setenv("AND_FRAMELESS", "1")
 	a := fyneapp.NewWithID("com.and.network")
 	a.Settings().SetTheme(monoTheme{})
+	a.SetIcon(appIcon())
 
 	m, err := andapp.NewManager(Version, true)
 	if err != nil {
@@ -221,6 +238,7 @@ func main() {
 	}
 	u := &ui{app: a, m: m, profileBtns: map[string]*widget.Button{}, profileNames: map[string]string{}}
 	u.w = a.NewWindow("&")
+	u.w.SetIcon(appIcon())
 	u.w.Resize(fyne.NewSize(960, 680))
 	u.w.SetFixedSize(false)
 	u.w.SetPadded(false)
@@ -251,12 +269,15 @@ func (u *ui) build() {
 	u.nav[0] = u.navButton("DPI", iconDPI, 0)
 	u.nav[1] = u.navButton("TELEGRAM", iconTelegram, 1)
 	u.nav[2] = u.navButton("WEB", iconWeb, 2)
-	nav := container.NewVBox(u.nav[0], u.nav[1], u.nav[2])
+	u.nav[3] = u.navButton("СПИСКИ", iconLists, 3)
+	nav := container.NewVBox(u.nav[0], u.nav[1], u.nav[2], u.nav[3])
 	root := text("ROOT", 10, gray, false)
 	root.TextStyle.Monospace = true
 	help := widget.NewButtonWithIcon("", lightIcon(iconHelp), func() { u.startTour() })
 	help.Importance = widget.LowImportance
-	side := container.NewVBox(spacer(14), nav, layout.NewSpacer(), container.NewHBox(root, help))
+	u.updateBtn = widget.NewButtonWithIcon("", lightIcon(iconRefresh), func() { go u.updateAction() })
+	u.updateBtn.Importance = widget.LowImportance
+	side := container.NewVBox(spacer(14), nav, layout.NewSpacer(), container.NewHBox(root, help, u.updateBtn))
 	sideBg := canvas.NewLinearGradient(surface, bg, 90)
 	sidePanel := container.NewStack(sideBg, container.NewPadded(side))
 
@@ -315,13 +336,43 @@ func (u *ui) build() {
 		),
 	))
 
+	// Lists page
+	listsView := u.m.CustomLists()
+	u.listsDomainsBuiltin = listLabel(strings.Join(listsView.BuiltinDomains, "\n"))
+	u.listsIPsBuiltin = listLabel(strings.Join(listsView.BuiltinIPs, "\n"))
+	u.listsDomains = widget.NewMultiLineEntry()
+	u.listsDomains.SetPlaceHolder("example.com\nsub.example.com")
+	u.listsDomains.SetMinRowsVisible(5)
+	u.listsDomains.SetText(strings.Join(listsView.Domains, "\n"))
+	u.listsIPs = widget.NewMultiLineEntry()
+	u.listsIPs.SetPlaceHolder("1.2.3.4\n2a00:1450::/32")
+	u.listsIPs.SetMinRowsVisible(5)
+	u.listsIPs.SetText(strings.Join(listsView.IPs, "\n"))
+	saveLists := widget.NewButtonWithIcon("СОХРАНИТЬ", lightIcon(iconCheck), func() { go u.saveLists() })
+	saveLists.Importance = widget.HighImportance
+	left := container.NewVBox(
+		label("ВСТРОЕННЫЕ ДОМЕНЫ", true), u.listsDomainsBuiltin,
+		separator(), label("СВОИ ДОМЕНЫ", true), u.listsDomains,
+	)
+	right := container.NewVBox(
+		label("ВСТРОЕННЫЕ IP / CIDR", true), u.listsIPsBuiltin,
+		separator(), label("СВОИ IP / CIDR", true), u.listsIPs,
+	)
+	u.pages[3] = card(container.NewBorder(nil,
+		container.NewVBox(separator(), saveLists), nil, nil,
+		container.NewGridWithColumns(2, left, right)))
+
 	u.buildGuide()
 	u.loadProfiles()
 	u.showTab(0)
+	go func() {
+		time.Sleep(2 * time.Second)
+		u.checkUpdates(true)
+	}()
 
 	u.main = widget.NewButtonWithIcon("ВКЛЮЧИТЬ ВСЁ", darkIcon(iconPlay), func() { go u.toggleAll() })
 	u.main.Importance = widget.HighImportance
-	pageStack := container.NewStack(u.pages[0], u.pages[1], u.pages[2])
+	pageStack := container.NewStack(u.pages[0], u.pages[1], u.pages[2], u.pages[3])
 	center := container.NewBorder(u.guidePanel, nil, nil, nil, pageStack)
 	grip := &resizeGrip{onDrag: u.resizeWindow}
 	bottom := container.NewBorder(nil, nil, nil, grip, u.main)
@@ -350,6 +401,7 @@ type dragBar struct {
 	onMove  func()
 	onEnd   func()
 	started bool
+	accum   float32
 }
 
 func (d *dragBar) CreateRenderer() fyne.WidgetRenderer {
@@ -364,6 +416,10 @@ func (d *dragBar) MinSize() fyne.Size { return fyne.NewSize(240, 40) }
 
 func (d *dragBar) Dragged(e *fyne.DragEvent) {
 	if !d.started {
+		d.accum += float32(abs(e.Dragged.DX)) + float32(abs(e.Dragged.DY))
+		if d.accum < 4 {
+			return
+		}
 		d.started = true
 		if d.onStart != nil {
 			d.onStart()
@@ -375,9 +431,17 @@ func (d *dragBar) Dragged(e *fyne.DragEvent) {
 }
 func (d *dragBar) DragEnd() {
 	d.started = false
+	d.accum = 0
 	if d.onEnd != nil {
 		d.onEnd()
 	}
+}
+
+func abs(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 type resizeGrip struct {
@@ -450,6 +514,80 @@ func (u *ui) titleBar() fyne.CanvasObject {
 	bg.StrokeColor = line
 	bg.StrokeWidth = 1
 	return container.NewStack(bg, container.NewPadded(row))
+}
+
+func listLabel(value string) *widget.Label {
+	l := widget.NewLabel(value)
+	l.Wrapping = fyne.TextWrapWord
+	l.TextStyle = fyne.TextStyle{Monospace: true}
+	l.SizeName = theme.SizeNameCaptionText
+	l.Selectable = true
+	return l
+}
+
+func splitLines(value string) []string {
+	var out []string
+	for _, line := range strings.Split(value, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+func (u *ui) reloadLists() {
+	view := u.m.CustomLists()
+	u.listsDomainsBuiltin.SetText(strings.Join(view.BuiltinDomains, "\n"))
+	u.listsIPsBuiltin.SetText(strings.Join(view.BuiltinIPs, "\n"))
+	u.listsDomains.SetText(strings.Join(view.Domains, "\n"))
+	u.listsIPs.SetText(strings.Join(view.IPs, "\n"))
+}
+
+func (u *ui) saveLists() {
+	res := u.m.SaveCustomLists(splitLines(u.listsDomains.Text), splitLines(u.listsIPs.Text))
+	if res.OK {
+		fyne.Do(u.reloadLists)
+	}
+	u.done(res)
+}
+
+func (u *ui) updateAction() {
+	if u.updateURL != "" {
+		if err := platform.OpenURL(u.updateURL); err != nil {
+			u.fail(err.Error())
+		}
+		return
+	}
+	go u.checkUpdates(false)
+}
+
+func (u *ui) checkUpdates(silent bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	info, err := update.Check(ctx, Version, update.ReleaseAPI)
+	if err != nil {
+		if !silent {
+			fyne.Do(func() { u.fail("Проверка обновлений: " + err.Error()) })
+		}
+		return
+	}
+	if info.Available {
+		fyne.Do(func() {
+			u.updateURL = info.URL
+			u.updateBtn.SetText("v" + info.Latest)
+			u.updateBtn.Refresh()
+			if !silent {
+				dialog.ShowInformation("&", "Доступна версия "+info.Latest+". Нажми кнопку с версией, чтобы открыть релиз.", u.w)
+			}
+		})
+		return
+	}
+	if !silent {
+		fyne.Do(func() {
+			dialog.ShowInformation("&", "Обновлений нет. Установлена "+info.Current+".", u.w)
+		})
+	}
 }
 
 func (u *ui) firstRun() bool {
@@ -654,8 +792,8 @@ func (u *ui) refresh() {
 
 func (u *ui) showTab(i int) {
 	u.active = i
-	titles := []string{"DPI-ОБХОД", "TELEGRAM-ПРОКСИ", "TELEGRAM WEB"}
-	subs := []string{"NFTABLES / NFQUEUE", "MTPROTO / WEBSOCKET", "СИСТЕМНЫЙ HOSTS"}
+	titles := []string{"DPI-ОБХОД", "TELEGRAM-ПРОКСИ", "TELEGRAM WEB", "СПИСКИ"}
+	subs := []string{"NFTABLES / NFQUEUE", "MTPROTO / WEBSOCKET", "СИСТЕМНЫЙ HOSTS", "ДОМЕНЫ И IP / CIDR"}
 	u.title.Text = titles[i]
 	u.subtitle.Text = subs[i]
 	u.title.Refresh()
