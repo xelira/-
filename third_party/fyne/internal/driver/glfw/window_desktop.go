@@ -955,13 +955,19 @@ func (w *window) MoveWindow(dx, dy int) {
 
 // & stable window moving: track the global cursor position instead of
 // feeding window-relative drag deltas back into SetPos (which causes jitter).
+func cursorGlobal(v *glfw.Window) (float64, float64) {
+	x, y := v.GetPos()
+	cx, cy := v.GetCursorPos()
+	return float64(x) + cx, float64(y) + cy
+}
+
 func (w *window) StartWindowDrag() {
 	v := w.view()
 	if v == nil {
 		return
 	}
 	w.dragStartWinX, w.dragStartWinY = v.GetPos()
-	w.dragStartCursorX, w.dragStartCursorY = v.GetCursorPos()
+	w.dragStartCursorX, w.dragStartCursorY = cursorGlobal(v)
 	w.dragging = true
 }
 
@@ -973,10 +979,7 @@ func (w *window) DragWindowToCursor() {
 	if v == nil {
 		return
 	}
-	x, y := v.GetPos()
-	cx, cy := v.GetCursorPos()
-	globalX := float64(x) + cx
-	globalY := float64(y) + cy
+	globalX, globalY := cursorGlobal(v)
 	v.SetPos(
 		w.dragStartWinX+int(globalX-w.dragStartCursorX),
 		w.dragStartWinY+int(globalY-w.dragStartCursorY),
