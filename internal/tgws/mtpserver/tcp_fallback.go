@@ -59,6 +59,9 @@ func (s *MTServer) dialTCPFallback(ctx context.Context, targetIP string, relayIn
 	if err != nil {
 		return nil, fmt.Errorf("tcp fallback dial %s: %w", addr, err)
 	}
+	if tc, ok := tcpConn.(*net.TCPConn); ok {
+		_ = tc.SetNoDelay(true)
+	}
 	if _, err := tcpConn.Write(relayInit[:]); err != nil {
 		_ = tcpConn.Close()
 		return nil, fmt.Errorf("tcp fallback send init %s: %w", addr, err)

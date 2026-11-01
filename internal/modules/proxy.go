@@ -19,6 +19,8 @@ import (
 	"ampersand/internal/process"
 	tgwscfg "ampersand/internal/tgws/config"
 	"ampersand/internal/tgws/mtpserver"
+	"ampersand/internal/tgws/telegram"
+	"ampersand/internal/tgws/wsbridge"
 )
 
 type Proxy struct {
@@ -56,6 +58,29 @@ func (p *Proxy) Probe() []core.Check {
 		}
 	}
 	return checks
+}
+
+func directWSReachable(ctx context.Context, cfg tgwscfg.Config) bool {
+	if len(cfg.DCIPs) == 0 {
+		return false
+	}
+	for dc, ip := range cfg.DCIPs {
+		if ip == "" {
+			continue
+		}
+		domains := telegram.WSDomains(dc, false)
+		if len(domains) == 0 {
+			continue
+		}
+		probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		ws, err := wsbridge.Dial(probeCtx, cfg, ip, domains[0])
+		cancel()
+		if err == nil {
+			_ = ws.Close()
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Proxy) Start(ctx context.Context, cfg config.Proxy, secret string) error {
@@ -98,6 +123,13 @@ func (p *Proxy) Start(ctx context.Context, cfg config.Proxy, secret string) erro
 		tcfg.CFDomainSource = tgwscfg.CFDomainSourceBuiltin
 		if len(tcfg.CFDomains) > 0 {
 			tcfg.CFDomain = tcfg.CFDomains[0]
+		}
+		// Direct Telegram DCs are blocked on many networks. Trying them first
+		// costs a full DialTimeout on every new relay; use CF first when a
+		// quick direct WebSocket probe fails.
+		if !directWSReachable(ctx, tcfg) {
+			tcfg.UseCFProxyFirst = true
+			p.logger.Info("telegram direct WS unavailable, using Cloudflare first")
 		}
 	}
 	// Логи движка не нужны в UI и не должны разрастаться.

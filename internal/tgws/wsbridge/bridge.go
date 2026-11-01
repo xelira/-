@@ -84,6 +84,9 @@ func DialEndpoint(ctx context.Context, cfg config.Config, ep WSEndpoint) (*Clien
 	if err != nil {
 		return nil, err
 	}
+	if tc, ok := rawConn.(*net.TCPConn); ok {
+		_ = tc.SetNoDelay(true)
+	}
 
 	var conn net.Conn = rawConn
 	if !ep.Plain {

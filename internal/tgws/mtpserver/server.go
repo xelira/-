@@ -136,6 +136,9 @@ func (s *MTServer) Run(ctx context.Context) error {
 				return err
 			}
 		}
+		if tc, ok := conn.(*net.TCPConn); ok {
+			_ = tc.SetNoDelay(true)
+		}
 		go func(conn net.Conn) {
 			defer func() { <-sem }()
 			s.handleConn(ctx, conn)
@@ -193,6 +196,9 @@ func (s *MTServer) dialUpstream(
 	tcpConn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", addr)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("upstream dial %s: %w", addr, err)
+	}
+	if tc, ok := tcpConn.(*net.TCPConn); ok {
+		_ = tc.SetNoDelay(true)
 	}
 
 	handshake, upEnc, upDec, err := mtproto.GenerateClientHandshake(key, dc, proto)
