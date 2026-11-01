@@ -25,3 +25,11 @@ web.facebook.com
 fbcdn.net
 cdnfacebook.net
 static.xx.fbcdn.net
+youtube.com
+youtu.be
+youtube-nocookie.com
+googlevideo.com
+ytimg.com
+ggpht.com
+youtubei.googleapis.com
+youtube.googleapis.com

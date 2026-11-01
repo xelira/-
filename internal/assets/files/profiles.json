@@ -4,7 +4,7 @@
     {
       "id": "android-disorder",
       "name": "Android Disorder + TLS",
-      "description": "ByeDPI disorder 1 и разделение TLS-записи. Базовый режим, проверенный на Instagram.",
+      "description": "ByeDPI disorder + TLS record split. Базовая стратегия для Instagram.",
       "platforms": [
         "android"
       ],
@@ -46,7 +46,56 @@
         "license": "MIT",
         "upstream": "ByeDPI",
         "upstreamVersion": "0.17.3",
-        "notes": "Основная Android-стратегия: disorder + TLS record split."
+        "notes": "Базовая Android-стратегия для Instagram."
+      }
+    },
+    {
+      "id": "android-youtube",
+      "name": "Android YouTube",
+      "description": "ByeDPI disorder + split 3/6 для YouTube.",
+      "platforms": [
+        "android"
+      ],
+      "engines": {
+        "android": {
+          "id": "byedpi",
+          "version": "0.17.3"
+        }
+      },
+      "ports": {
+        "tcp": [
+          "80",
+          "443"
+        ],
+        "udp": [
+          "443"
+        ]
+      },
+      "windows": {
+        "args": []
+      },
+      "linux": {
+        "args": []
+      },
+      "android": {
+        "args": [
+          "-d1",
+          "-s3+s",
+          "-d6+s"
+        ]
+      },
+      "source": {
+        "repository": "https://github.com/hufrea/byedpi",
+        "revision": "v0.17.3",
+        "files": [
+          "main.c",
+          "desync.c",
+          "extend.c"
+        ],
+        "license": "MIT",
+        "upstream": "ByeDPI",
+        "upstreamVersion": "0.17.3",
+        "notes": "YouTube: disorder + split 3/6."
       }
     },
     {

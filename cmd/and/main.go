@@ -352,8 +352,11 @@ func (u *ui) build() {
 		container.NewCenter(u.link),
 	))
 
-	// Web / hosts page.
-	if platform.HostsSupported() {
+	// Web / hosts page. Android build has no WEB tab at all.
+	if u.mobile {
+		u.web = nil
+		u.pages[2] = container.NewStack()
+	} else if platform.HostsSupported() {
 		u.web = widget.NewButtonWithIcon("ИСПРАВИТЬ HOSTS", lightIcon(iconWeb), func() { go u.toggleWeb() })
 		u.web.Importance = widget.MediumImportance
 		u.pages[2] = card(container.NewBorder(
@@ -761,7 +764,12 @@ func (u *ui) showTab(i int) {
 	u.subtitle.Text = subs[i]
 	u.title.Refresh()
 	u.subtitle.Refresh()
-	for n, p := range u.pages {
+	indices := []int{0, 1, 2, 3}
+	if u.mobile {
+		indices = []int{0, 1, 3}
+	}
+	for _, n := range indices {
+		p := u.pages[n]
 		if n == i {
 			p.Show()
 			u.nav[n].Importance = widget.HighImportance

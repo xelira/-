@@ -10,6 +10,8 @@ import android.net.Uri
 import android.net.VpnService
 import android.util.Log
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 import java.io.File
@@ -75,12 +77,17 @@ object DpiBridge {
             .setAction(DpiVpnService.ACTION_START)
             .putExtra(DpiVpnService.EXTRA_CONFIG, config)
         ContextCompat.startForegroundService(context, intent)
+        maybeRequestBatteryExemption(context)
     }
 
     fun stop(context: Context) {
         Log.d("AndDpi", "stop requested")
-        val stopped = context.stopService(Intent(context, DpiVpnService::class.java))
-        Log.d("AndDpi", "stopService returned $stopped")
+        val intent = Intent(context, DpiVpnService::class.java).setAction(DpiVpnService.ACTION_STOP)
+        runCatching { context.startService(intent) }
+            .onFailure {
+                Log.w("AndDpi", "startService stop failed, falling back to stopService", it)
+                context.stopService(Intent(context, DpiVpnService::class.java))
+            }
     }
 
     fun isRunning(context: Context): Boolean {
@@ -115,6 +122,20 @@ object DpiBridge {
             File(context.filesDir, KEEPALIVE_FILE).delete()
             context.stopService(Intent(context, ProxyKeepAliveService::class.java))
         }
+    }
+
+    private fun maybeRequestBatteryExemption(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val marker = File(context.filesDir, "battery-asked")
+        if (marker.exists()) return
+        val pm = context.getSystemService(PowerManager::class.java) ?: return
+        if (pm.isIgnoringBatteryOptimizations(context.packageName)) return
+        runCatching { marker.writeText("1") }
+        val intent = Intent(
+            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            Uri.parse("package:${context.packageName}")
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
     }
 
     fun statusFile(context: Context): File = File(context.filesDir, STATUS_FILE)

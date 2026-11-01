@@ -5,7 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.IpPrefix
@@ -13,6 +15,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import hev.htproxy.TProxyService
@@ -32,6 +35,8 @@ class DpiVpnService : VpnService() {
     private var proxyThread: Thread? = null
     private var tunnelThread: Thread? = null
     private var heartbeat: Thread? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private lateinit var prefs: SharedPreferences
 
     override fun onBind(intent: Intent?): IBinder? {
         return super.onBind(intent)
@@ -39,6 +44,7 @@ class DpiVpnService : VpnService() {
 
     override fun onCreate() {
         super.onCreate()
+        prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         createChannel()
     }
 
@@ -51,19 +57,38 @@ class DpiVpnService : VpnService() {
                 if (config.isNullOrBlank()) {
                     fail("Пустая конфигурация DPI")
                 } else {
+                    prefs.edit().putString(KEY_CONFIG, config).putBoolean(KEY_DESIRED, true).apply()
                     startEngine(config)
                 }
             }
-            ACTION_STOP -> stopEngine()
+            ACTION_STOP -> {
+                // startForeground must be called even for the stop command:
+                // Android 12+ can otherwise kill the process with
+                // ForegroundServiceDidNotStartInTimeException.
+                startForegroundCompat("Остановка DPI…")
+                stopEngine(explicit = true)
+            }
             else -> {
-                if (!engineRunning.get()) stopSelf()
+                val config = prefs.getString(KEY_CONFIG, null)
+                if (prefs.getBoolean(KEY_DESIRED, false) && !config.isNullOrBlank()) {
+                    Log.d("AndDpi", "restoring DPI after service restart")
+                    startForegroundCompat("Восстановление DPI…")
+                    startEngine(config)
+                } else {
+                    prefs.edit().putBoolean(KEY_DESIRED, false).apply()
+                    stopSelf()
+                }
             }
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d("AndDpi", "task removed, keeping DPI service alive")
     }
 
     override fun onRevoke() {
-        stopEngine("VPN отозван системой")
+        stopEngine("VPN отозван системой", explicit = true)
     }
 
     override fun onDestroy() {
@@ -141,6 +166,7 @@ class DpiVpnService : VpnService() {
                 if (stopping.get()) return@thread
                 DpiBridge.writeStatus(this, true, "", port)
                 updateNotification("ByeDPI работает · порт $port")
+                acquireWakeLock()
                 heartbeat = thread(name = "dpi-heartbeat", isDaemon = true) {
                     while (!stopping.get() && engineRunning.get()) {
                         DpiBridge.writeStatus(this, true, "", port)
@@ -185,8 +211,27 @@ class DpiVpnService : VpnService() {
         throw IllegalStateException("ByeDPI не открыл локальный порт $port")
     }
 
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        runCatching {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "and:dpi").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    private fun releaseWakeLock() {
+        runCatching { if (wakeLock?.isHeld == true) wakeLock?.release() }
+        wakeLock = null
+    }
+
     @Synchronized
-    private fun stopEngine(error: String? = null) {
+    private fun stopEngine(error: String? = null, explicit: Boolean = false) {
+        if (explicit) {
+            prefs.edit().putBoolean(KEY_DESIRED, false).remove(KEY_CONFIG).apply()
+        }
         if (stopping.getAndSet(true) && !engineRunning.get()) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -200,6 +245,7 @@ class DpiVpnService : VpnService() {
         tun = null
         engineRunning.set(false)
         runCatching { heartbeat?.join(500) }
+        releaseWakeLock()
         DpiBridge.writeStatus(this, false, error ?: "", 0)
         updateNotification(if (error != null) error else "DPI выключен")
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -208,7 +254,7 @@ class DpiVpnService : VpnService() {
 
     private fun fail(message: String) {
         DpiBridge.writeStatus(this, false, message)
-        stopEngine(message)
+        stopEngine(message, explicit = true)
     }
 
     private fun createChannel() {
@@ -224,11 +270,17 @@ class DpiVpnService : VpnService() {
         val intent = PendingIntent.getActivity(
             this, 0, Intent(this, AndActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
+        val stopIntent = PendingIntent.getService(
+            this, 2,
+            Intent(this, DpiVpnService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE
+        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_and)
             .setContentTitle("& · DPI")
             .setContentText(text)
             .setContentIntent(intent)
+            .addAction(R.drawable.ic_stat_and, "Остановить", stopIntent)
             .setOngoing(true)
             .setSilent(true)
             .build()
@@ -254,6 +306,9 @@ class DpiVpnService : VpnService() {
         const val ACTION_START = "com.and.app.dpi.START"
         const val ACTION_STOP = "com.and.app.dpi.STOP"
         const val EXTRA_CONFIG = "com.and.app.dpi.CONFIG"
+        private const val PREFS = "and-dpi-prefs"
+        private const val KEY_CONFIG = "config"
+        private const val KEY_DESIRED = "desired"
         private const val CHANNEL_ID = "and-dpi"
         private const val NOTIFICATION_ID = 41
     }
