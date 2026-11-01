@@ -78,6 +78,7 @@ var (
 	iconGrip     = mustIcon("grip.svg")
 	iconLists    = mustIcon("lists.svg")
 	iconRefresh  = mustIcon("refresh.svg")
+	iconPower    = mustIcon("power.svg")
 )
 
 func lightIcon(base fyne.Resource) fyne.Resource {
@@ -221,10 +222,17 @@ type ui struct {
 	listsDomainsBuiltin, listsIPsBuiltin *widget.Label
 	updateBtn                            *widget.Button
 	updateURL                            string
+	autostart                            *widget.Button
 }
 
 func main() {
 	_ = os.Setenv("AND_FRAMELESS", "1")
+	hidden := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--hidden" {
+			hidden = true
+		}
+	}
 	a := fyneapp.NewWithID("com.and.network")
 	a.Settings().SetTheme(monoTheme{})
 	a.SetIcon(appIcon())
@@ -249,6 +257,11 @@ func main() {
 		a.Quit()
 	})
 	u.w.Show()
+	if hidden {
+		if c := u.controls(); c != nil {
+			c.MinimizeWindow()
+		}
+	}
 	if u.firstRun() {
 		fyne.Do(u.startTour)
 	}
@@ -277,7 +290,9 @@ func (u *ui) build() {
 	help.Importance = widget.LowImportance
 	u.updateBtn = widget.NewButtonWithIcon("", lightIcon(iconRefresh), func() { go u.updateAction() })
 	u.updateBtn.Importance = widget.LowImportance
-	side := container.NewVBox(spacer(14), nav, layout.NewSpacer(), container.NewHBox(root, help, u.updateBtn))
+	u.autostart = widget.NewButtonWithIcon("АВТОЗАПУСК", lightIcon(iconPower), func() { go u.toggleAutostart() })
+	u.autostart.Importance = widget.LowImportance
+	side := container.NewVBox(spacer(14), nav, spacer(10), u.autostart, layout.NewSpacer(), container.NewHBox(root, help, u.updateBtn))
 	sideBg := canvas.NewLinearGradient(surface, bg, 90)
 	sidePanel := container.NewStack(sideBg, container.NewPadded(side))
 
@@ -780,6 +795,14 @@ func (u *ui) refresh() {
 		}
 	}
 	u.main.Refresh()
+	if st.Settings.Autostart {
+		u.autostart.SetText("АВТОЗАПУСК ВКЛ")
+		u.autostart.Icon = lightIcon(iconCheck)
+	} else {
+		u.autostart.SetText("АВТОЗАПУСК")
+		u.autostart.Icon = lightIcon(iconPower)
+	}
+	u.autostart.Refresh()
 	if st.TelegramWeb.Applied {
 		u.web.SetText("ВЕРНУТЬ HOSTS")
 		u.web.Icon = lightIcon(iconCheck)
@@ -821,6 +844,13 @@ func (u *ui) navButton(name string, base fyne.Resource, index int) *widget.Butto
 }
 
 func (u *ui) toggleAll() { u.done(u.m.Toggle()) }
+
+func (u *ui) toggleAutostart() {
+	st := u.m.GetState()
+	s := st.Settings
+	s.Autostart = !s.Autostart
+	u.done(u.m.SaveSettings(s))
+}
 
 func (u *ui) toggleDPI() {
 	if u.m.GetState().DPI.Kind == "running" {
