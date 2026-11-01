@@ -19,3 +19,5 @@ go build -trimpath -o and ./cmd/and
 ```
 
 Windows-сборка требует CGO и mingw. Всё остальное — CI.
+
+:)
