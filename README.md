@@ -29,7 +29,7 @@ source /mnt/storage/mobile-dev/env.sh
 ./scripts/build-android.sh
 ```
 
-APK: `dist/and-2.1.0.apk`.
+APK: `dist/and-2.2.2 OBT.apk`.
 
 Android-версия не требует root:
 
@@ -46,10 +46,10 @@ Android-версия не требует root:
 
 ```bash
 # Linux
-CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.Version=2.1.0" -o and ./cmd/and
+CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.Version=2.2.2 OBT" -o and ./cmd/and
 
 # Windows (CGO + mingw)
-CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w -X main.Version=2.1.0" -o and.exe ./cmd/and
+CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w -X main.Version=2.2.2 OBT" -o and.exe ./cmd/and
 ```
 
 Windows и Linux также собираются в CI.

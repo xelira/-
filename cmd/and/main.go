@@ -25,7 +25,7 @@ import (
 	"ampersand/internal/update"
 )
 
-var Version = "2.1.0"
+var Version = "2.2.2-obt"
 
 //go:embed fonts/*.ttf
 var fontFS embed.FS
