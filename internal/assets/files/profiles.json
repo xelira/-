@@ -3,8 +3,8 @@
   "profiles": [
     {
       "id": "android-disorder",
-      "name": "Android Disorder + TLS",
-      "description": "ByeDPI disorder + TLS record split. Базовая стратегия для Instagram.",
+      "name": "ОСНОВНОЙ",
+      "description": "Instagram, Telegram и большинство сайтов. Если не знаешь, что выбрать — начни с него.",
       "platforms": [
         "android"
       ],
@@ -51,8 +51,8 @@
     },
     {
       "id": "android-youtube",
-      "name": "Android YouTube",
-      "description": "ByeDPI disorder + split 3/6 для YouTube.",
+      "name": "YOUTUBE",
+      "description": "YouTube и видео. Включай, если YouTube не открывается на основном профиле.",
       "platforms": [
         "android"
       ],
@@ -99,153 +99,9 @@
       }
     },
     {
-      "id": "android-disorder-split",
-      "name": "Android Disorder + Split",
-      "description": "ByeDPI disorder 1 и split по SNI. Запасной режим для строгого DPI.",
-      "platforms": [
-        "android"
-      ],
-      "engines": {
-        "android": {
-          "id": "byedpi",
-          "version": "0.17.3"
-        }
-      },
-      "ports": {
-        "tcp": [
-          "80",
-          "443"
-        ],
-        "udp": [
-          "443"
-        ]
-      },
-      "windows": {
-        "args": []
-      },
-      "linux": {
-        "args": []
-      },
-      "android": {
-        "args": [
-          "-d1",
-          "-s1+s"
-        ]
-      },
-      "source": {
-        "repository": "https://github.com/hufrea/byedpi",
-        "revision": "v0.17.3",
-        "files": [
-          "main.c",
-          "desync.c",
-          "extend.c"
-        ],
-        "license": "MIT",
-        "upstream": "ByeDPI",
-        "upstreamVersion": "0.17.3",
-        "notes": "Android использует ByeDPI через VpnService без root."
-      }
-    },
-    {
-      "id": "android-disorder-tlsrec",
-      "name": "Android Disorder + TLS Record",
-      "description": "ByeDPI disorder 1 и разделение TLS-записи по SNI.",
-      "platforms": [
-        "android"
-      ],
-      "engines": {
-        "android": {
-          "id": "byedpi",
-          "version": "0.17.3"
-        }
-      },
-      "ports": {
-        "tcp": [
-          "80",
-          "443"
-        ],
-        "udp": [
-          "443"
-        ]
-      },
-      "windows": {
-        "args": []
-      },
-      "linux": {
-        "args": []
-      },
-      "android": {
-        "args": [
-          "-d1",
-          "-r1+s"
-        ]
-      },
-      "source": {
-        "repository": "https://github.com/hufrea/byedpi",
-        "revision": "v0.17.3",
-        "files": [
-          "main.c",
-          "desync.c",
-          "extend.c"
-        ],
-        "license": "MIT",
-        "upstream": "ByeDPI",
-        "upstreamVersion": "0.17.3",
-        "notes": "Android использует ByeDPI через VpnService без root."
-      }
-    },
-    {
-      "id": "android-oob",
-      "name": "Android OOB",
-      "description": "ByeDPI disorder 1 и out-of-band байт в SNI.",
-      "platforms": [
-        "android"
-      ],
-      "engines": {
-        "android": {
-          "id": "byedpi",
-          "version": "0.17.3"
-        }
-      },
-      "ports": {
-        "tcp": [
-          "80",
-          "443"
-        ],
-        "udp": [
-          "443"
-        ]
-      },
-      "windows": {
-        "args": []
-      },
-      "linux": {
-        "args": []
-      },
-      "android": {
-        "args": [
-          "-d1",
-          "-o1+s"
-        ]
-      },
-      "source": {
-        "repository": "https://github.com/hufrea/byedpi",
-        "revision": "v0.17.3",
-        "files": [
-          "main.c",
-          "desync.c",
-          "extend.c"
-        ],
-        "license": "MIT",
-        "upstream": "ByeDPI",
-        "upstreamVersion": "0.17.3",
-        "notes": "Android использует ByeDPI через VpnService без root."
-      }
-    },
-    {
       "id": "android-split-oob",
-      "name": "Android Split + OOB",
-      "description": "ByeDPI split и OOB без disorder. Мягкий режим для нестабильных сетей.",
+      "name": "МЯГКИЙ",
+      "description": "Мягкий режим. Для сетей, где основной профиль рвёт соединение.",
       "platforms": [
         "android"
       ],
@@ -291,57 +147,9 @@
       }
     },
     {
-      "id": "android-fake",
-      "name": "Android Fake TLS",
-      "description": "ByeDPI fake с TTL 8. Может не работать на части Android-ядер.",
-      "platforms": [
-        "android"
-      ],
-      "engines": {
-        "android": {
-          "id": "byedpi",
-          "version": "0.17.3"
-        }
-      },
-      "ports": {
-        "tcp": [
-          "80",
-          "443"
-        ],
-        "udp": [
-          "443"
-        ]
-      },
-      "windows": {
-        "args": []
-      },
-      "linux": {
-        "args": []
-      },
-      "android": {
-        "args": [
-          "-f-1",
-          "-t8"
-        ]
-      },
-      "source": {
-        "repository": "https://github.com/hufrea/byedpi",
-        "revision": "v0.17.3",
-        "files": [
-          "main.c",
-          "desync.c",
-          "extend.c"
-        ],
-        "license": "MIT",
-        "upstream": "ByeDPI",
-        "upstreamVersion": "0.17.3",
-        "notes": "Android использует ByeDPI через VpnService без root."
-      }
-    },
-    {
       "id": "android-lists",
-      "name": "Android по спискам",
-      "description": "ByeDPI disorder 1 только для доменов из встроенного и пользовательского списков.",
+      "name": "ПО СПИСКАМ",
+      "description": "Обход только для доменов из вкладки «Списки». Для точечной настройки.",
       "platforms": [
         "android"
       ],
@@ -371,55 +179,6 @@
           "-d1",
           "-H",
           "{lists}/list-general-user.txt"
-        ]
-      },
-      "source": {
-        "repository": "https://github.com/hufrea/byedpi",
-        "revision": "v0.17.3",
-        "files": [
-          "main.c",
-          "desync.c",
-          "extend.c"
-        ],
-        "license": "MIT",
-        "upstream": "ByeDPI",
-        "upstreamVersion": "0.17.3",
-        "notes": "Android использует ByeDPI через VpnService без root."
-      }
-    },
-    {
-      "id": "android-ipset",
-      "name": "Android по IP",
-      "description": "ByeDPI disorder 1 только для IP/CIDR из ip-list.default.",
-      "platforms": [
-        "android"
-      ],
-      "engines": {
-        "android": {
-          "id": "byedpi",
-          "version": "0.17.3"
-        }
-      },
-      "ports": {
-        "tcp": [
-          "80",
-          "443"
-        ],
-        "udp": [
-          "443"
-        ]
-      },
-      "windows": {
-        "args": []
-      },
-      "linux": {
-        "args": []
-      },
-      "android": {
-        "args": [
-          "-d1",
-          "-j",
-          "{lists}/ip-list.default"
         ]
       },
       "source": {

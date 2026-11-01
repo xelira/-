@@ -206,6 +206,8 @@ type ui struct {
 	profileBox   *fyne.Container
 	profileBtns  map[string]*widget.Button
 	profileNames map[string]string
+	profileDescs map[string]string
+	profileInfo  *widget.Label
 	cur          string
 	link         *canvas.Text
 	startDPI     *widget.Button
@@ -324,11 +326,15 @@ func (u *ui) build() {
 	u.startDPI.Importance = widget.HighImportance
 	apply := widget.NewButtonWithIcon("ПРИМЕНИТЬ", lightIcon(iconCheck), func() { go u.applyProfile() })
 	apply.Importance = widget.MediumImportance
+	u.profileInfo = widget.NewLabel("")
+	u.profileInfo.Wrapping = fyne.TextWrapWord
+	u.profileInfo.SizeName = theme.SizeNameCaptionText
+	u.profileInfo.Importance = widget.LowImportance
 	u.pages[0] = card(container.NewBorder(
 		container.NewVBox(label("ПРОФИЛЬ", true), separator()),
 		container.NewVBox(separator(), container.NewGridWithColumns(2, u.startDPI, apply)),
 		nil, nil,
-		profileScroll,
+		container.NewVBox(profileScroll, u.profileInfo),
 	))
 
 	// Telegram page.
@@ -638,6 +644,7 @@ func (u *ui) loadProfiles() {
 	profiles := u.m.GetProfiles()
 	st := u.m.GetState()
 	u.profileBox.Objects = nil
+	u.profileDescs = map[string]string{}
 	compatible := make([]andapp.ProfileView, 0, len(profiles))
 	for _, p := range profiles {
 		if p.Compatible {
@@ -663,6 +670,7 @@ func (u *ui) loadProfiles() {
 		b.Importance = widget.LowImportance
 		u.profileBtns[id] = b
 		u.profileNames[id] = name
+		u.profileDescs[id] = p.Description
 		u.profileBox.Add(b)
 	}
 	if st.ActiveProfile != "" {
@@ -682,6 +690,9 @@ func (u *ui) selectProfile(id string) {
 		return
 	}
 	u.cur = id
+	if u.profileInfo != nil {
+		u.profileInfo.SetText(u.profileDescs[id])
+	}
 	for key, b := range u.profileBtns {
 		name := u.profileNames[key]
 		if key == id {
