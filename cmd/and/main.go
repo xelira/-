@@ -220,6 +220,7 @@ type ui struct {
 
 	listsDomains, listsIPs               *widget.Entry
 	listsDomainsBuiltin, listsIPsBuiltin *widget.Label
+	listsDomainsCount, listsIPsCount     *canvas.Text
 	updateBtn                            *widget.Button
 	updateURL                            string
 	autostart                            *widget.Button
@@ -357,24 +358,41 @@ func (u *ui) build() {
 	u.listsIPsBuiltin = listLabel(strings.Join(listsView.BuiltinIPs, "\n"))
 	u.listsDomains = widget.NewMultiLineEntry()
 	u.listsDomains.SetPlaceHolder("example.com\nsub.example.com")
-	u.listsDomains.SetMinRowsVisible(5)
+	u.listsDomains.SetMinRowsVisible(4)
 	u.listsDomains.SetText(strings.Join(listsView.Domains, "\n"))
 	u.listsIPs = widget.NewMultiLineEntry()
 	u.listsIPs.SetPlaceHolder("1.2.3.4\n2a00:1450::/32")
-	u.listsIPs.SetMinRowsVisible(5)
+	u.listsIPs.SetMinRowsVisible(4)
 	u.listsIPs.SetText(strings.Join(listsView.IPs, "\n"))
+	u.listsDomainsCount = text(fmt.Sprintf("%d", len(listsView.Domains)), 10, dim, true)
+	u.listsDomainsCount.TextStyle.Monospace = true
+	u.listsIPsCount = text(fmt.Sprintf("%d", len(listsView.IPs)), 10, dim, true)
+	u.listsIPsCount.TextStyle.Monospace = true
 	saveLists := widget.NewButtonWithIcon("СОХРАНИТЬ", lightIcon(iconCheck), func() { go u.saveLists() })
 	saveLists.Importance = widget.HighImportance
+	hint := widget.NewLabel("Домены задают SNI и Host. IP / CIDR нужны, когда трафик идёт без домена. Свои записи добавляются к встроенным.")
+	hint.Wrapping = fyne.TextWrapWord
+	hint.SizeName = theme.SizeNameCaptionText
+	hint.Importance = widget.LowImportance
 	left := container.NewVBox(
-		label("ВСТРОЕННЫЕ ДОМЕНЫ", true), u.listsDomainsBuiltin,
-		separator(), label("СВОИ ДОМЕНЫ", true), u.listsDomains,
+		listSection("ВСТРОЕННЫЕ ДОМЕНЫ", text(fmt.Sprintf("%d", len(listsView.BuiltinDomains)), 10, dim, true)),
+		listBox(u.listsDomainsBuiltin),
+		spacer(4),
+		listSection("СВОИ ДОМЕНЫ", u.listsDomainsCount),
+		u.listsDomains,
 	)
 	right := container.NewVBox(
-		label("ВСТРОЕННЫЕ IP / CIDR", true), u.listsIPsBuiltin,
-		separator(), label("СВОИ IP / CIDR", true), u.listsIPs,
+		listSection("ВСТРОЕННЫЕ IP / CIDR", text(fmt.Sprintf("%d", len(listsView.BuiltinIPs)), 10, dim, true)),
+		listBox(u.listsIPsBuiltin),
+		spacer(4),
+		listSection("СВОИ IP / CIDR", u.listsIPsCount),
+		u.listsIPs,
 	)
-	u.pages[3] = card(container.NewBorder(nil,
-		container.NewVBox(separator(), saveLists), nil, nil,
+	u.pages[3] = card(container.NewBorder(
+		container.NewVBox(hint, spacer(6)),
+		container.NewVBox(separator(), container.NewBorder(nil, nil, saveLists, nil,
+			label("ВСТРОЕННЫЕ: list-general-user.txt · ip-list.default", true))),
+		nil, nil,
 		container.NewGridWithColumns(2, left, right)))
 
 	u.buildGuide()
@@ -540,6 +558,21 @@ func listLabel(value string) *widget.Label {
 	return l
 }
 
+func listSection(title string, count *canvas.Text) fyne.CanvasObject {
+	count.TextStyle.Monospace = true
+	return container.NewBorder(nil, nil, nil, count, label(title, true))
+}
+
+func listBox(content fyne.CanvasObject) fyne.CanvasObject {
+	scroll := container.NewVScroll(content)
+	scroll.SetMinSize(fyne.NewSize(0, 132))
+	bg := canvas.NewRectangle(raised)
+	bg.CornerRadius = 10
+	bg.StrokeColor = line
+	bg.StrokeWidth = 1
+	return container.NewStack(bg, container.NewPadded(scroll))
+}
+
 func splitLines(value string) []string {
 	var out []string
 	for _, line := range strings.Split(value, "\n") {
@@ -557,6 +590,10 @@ func (u *ui) reloadLists() {
 	u.listsIPsBuiltin.SetText(strings.Join(view.BuiltinIPs, "\n"))
 	u.listsDomains.SetText(strings.Join(view.Domains, "\n"))
 	u.listsIPs.SetText(strings.Join(view.IPs, "\n"))
+	u.listsDomainsCount.Text = fmt.Sprintf("%d", len(view.Domains))
+	u.listsIPsCount.Text = fmt.Sprintf("%d", len(view.IPs))
+	u.listsDomainsCount.Refresh()
+	u.listsIPsCount.Refresh()
 }
 
 func (u *ui) saveLists() {

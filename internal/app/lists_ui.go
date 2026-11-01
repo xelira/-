@@ -20,7 +20,7 @@ func (m *Manager) CustomLists() ListsView {
 	cfg := m.store.Snapshot()
 	view := ListsView{
 		BuiltinDomains: readList(filepath.Join(m.resources, "engines", "lists", "list-general-user.txt")),
-		BuiltinIPs:     readList(filepath.Join(m.resources, "engines", "lists", "telegram-cidr.txt")),
+		BuiltinIPs:     readList(filepath.Join(m.resources, "engines", "lists", "ip-list.default")),
 	}
 	for _, entry := range cfg.DPI.CustomAddresses {
 		entry = strings.TrimSpace(entry)

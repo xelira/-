@@ -13,3 +13,15 @@ telesco.pe
 cdn.telesco.pe
 telegra.ph
 graph.org
+instagram.com
+www.instagram.com
+i.instagram.com
+graph.instagram.com
+cdninstagram.com
+facebook.com
+www.facebook.com
+m.facebook.com
+web.facebook.com
+fbcdn.net
+cdnfacebook.net
+static.xx.fbcdn.net
