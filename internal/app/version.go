@@ -1,4 +1,4 @@
 package app
 
 // Version подменяется при сборке через -ldflags "-X ampersand/internal/app.Version=...".
-var Version = "2.2.2-obt"
+var Version = "2.2.3-obt"

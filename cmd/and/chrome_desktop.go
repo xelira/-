@@ -31,7 +31,7 @@ type dragBar struct {
 func (d *dragBar) CreateRenderer() fyne.WidgetRenderer {
 	mark := text("&", 22, white, true)
 	name := text("AMPERSAND", 11, white, true)
-	ver := text("2.2.2 ОБТ", 9, gray, false)
+	ver := text("2.2.3 ОБТ", 9, gray, false)
 	ver.TextStyle.Monospace = true
 	return widget.NewSimpleRenderer(container.NewHBox(mark, spacer(8), name, spacer(6), ver))
 }

@@ -72,9 +72,9 @@ func (c *Controller) Start(ctx context.Context, profile profiles.Profile, opts c
 	args := profiles.Expand(profile.Android.Args, root, bin, lists)
 	// Bind the SOCKS proxy to loopback only; ByeDPI defaults to 0.0.0.0.
 	args = append([]string{"-i127.0.0.1", "-p1080"}, args...)
-	// Only TCP/TLS is desynced. UDP is disabled in ByeDPI so browsers fall
-	// back from QUIC to TCP; DNS uses the underlying resolver directly.
-	args = append(args, "-Kt,h", "-U")
+	// Desync only TCP/TLS. UDP (voice chat, DNS and other real-time traffic)
+	// stays in a separate pass-through group so it is not dropped.
+	args = append(args, "-Kt,h", "-An", "-Ku")
 	cfg := Config{Args: args, Port: dpiPort, DNS: dpiDNS, IPv6: false}
 
 	code, err := StartBridge(cfg)
