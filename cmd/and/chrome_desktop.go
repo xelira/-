@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
@@ -31,7 +32,7 @@ type dragBar struct {
 func (d *dragBar) CreateRenderer() fyne.WidgetRenderer {
 	mark := text("&", 22, white, true)
 	name := text("AMPERSAND", 11, white, true)
-	ver := text("2.2.3 ОБТ", 9, gray, false)
+	ver := text("2.2.4 ОБТ", 9, gray, false)
 	ver.TextStyle.Monospace = true
 	return widget.NewSimpleRenderer(container.NewHBox(mark, spacer(8), name, spacer(6), ver))
 }
@@ -119,9 +120,7 @@ func (u *ui) resizeWindow(dx, dy float32) {
 func (u *ui) titleBar() fyne.CanvasObject {
 	drag := &dragBar{onStart: u.startWindowDrag, onMove: u.dragWindow, onEnd: u.endWindowDrag}
 	min := widget.NewButtonWithIcon("", lightIcon(iconMinimize), func() {
-		if c := u.controls(); c != nil {
-			c.MinimizeWindow()
-		}
+		u.minimizeToTray()
 	})
 	max := widget.NewButtonWithIcon("", lightIcon(iconMaximize), func() {
 		if c := u.controls(); c != nil {
@@ -179,6 +178,43 @@ func (u *ui) setupWindow() {
 		u.m.Close()
 		u.app.Quit()
 	})
+	u.setupTray()
+}
+
+func (u *ui) setupTray() {
+	app, ok := u.app.(desktop.App)
+	if !ok {
+		return
+	}
+	show := fyne.NewMenuItem("Открыть", func() { fyne.Do(u.showWindow) })
+	minimize := fyne.NewMenuItem("Свернуть в трей", func() { fyne.Do(u.minimizeToTray) })
+	toggle := fyne.NewMenuItem("Выключить всё", func() { fyne.Do(func() { go u.toggleAll() }) })
+	quit := fyne.NewMenuItem("Выход", func() { fyne.Do(u.quitApp) })
+	menu := fyne.NewMenu("&", show, minimize, fyne.NewMenuItemSeparator(), toggle, quit)
+	app.SetSystemTrayMenu(menu)
+	app.SetSystemTrayIcon(appIcon())
+	app.SetSystemTrayWindow(u.w)
+	u.trayReady = true
+}
+
+func (u *ui) showWindow() {
+	u.w.Show()
+	u.w.RequestFocus()
+}
+
+func (u *ui) minimizeToTray() {
+	if u.trayReady {
+		u.w.Hide()
+		return
+	}
+	if c := u.controls(); c != nil {
+		c.MinimizeWindow()
+	}
+}
+
+func (u *ui) quitApp() {
+	u.m.Close()
+	u.app.Quit()
 }
 
 func (u *ui) afterShow(hidden bool) {

@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
 import java.lang.ref.WeakReference
@@ -105,6 +106,16 @@ object DpiBridge {
     fun status(context: Context): String {
         val file = statusFile(context)
         return if (file.exists()) file.readText() else "{\"running\":false,\"error\":\"\"}"
+    }
+
+    fun installApk(context: Context, path: String) {
+        val file = File(path)
+        require(file.exists()) { "APK не найден" }
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 
     fun openUrl(context: Context, url: String) {

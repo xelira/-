@@ -176,6 +176,9 @@ func Status() string {
 // OpenURL opens a browser through the Android intent bridge.
 func OpenURL(url string) error { return OpenURLBridge(url) }
 
+// InstallAPK opens the system package installer for a downloaded APK.
+func InstallAPK(path string) error { return InstallAPKBridge(path) }
+
 // KeepAlive keeps the Fyne process alive while the Telegram proxy is running.
 func KeepAlive(enabled bool) error { return KeepAliveBridge(enabled) }
 

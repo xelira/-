@@ -20,11 +20,17 @@ type Info struct {
 	Tag       string `json:"tag"`
 	Available bool   `json:"available"`
 	URL       string `json:"url"`
+	APKURL    string `json:"apkUrl,omitempty"`
+	SHAURL    string `json:"shaUrl,omitempty"`
 }
 
 type release struct {
 	TagName string `json:"tag_name"`
 	HTMLURL string `json:"html_url"`
+	Assets  []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
 }
 
 // Check сравнивает текущую версию с тегом релиза. Сетевые ошибки не глотаем,
@@ -53,7 +59,16 @@ func Check(ctx context.Context, current, apiURL string) (Info, error) {
 	}
 	latest := strings.TrimPrefix(strings.TrimSpace(r.TagName), "v")
 	cur := strings.TrimPrefix(strings.TrimSpace(current), "v")
-	return Info{Current: cur, Latest: latest, Tag: r.TagName, Available: newer(latest, cur), URL: r.HTMLURL}, nil
+	info := Info{Current: cur, Latest: latest, Tag: r.TagName, Available: newer(latest, cur), URL: r.HTMLURL}
+	for _, asset := range r.Assets {
+		switch asset.Name {
+		case "and-android.apk":
+			info.APKURL = asset.BrowserDownloadURL
+		case "SHA256SUMS.txt":
+			info.SHAURL = asset.BrowserDownloadURL
+		}
+	}
+	return info, nil
 }
 
 func newer(a, b string) bool {

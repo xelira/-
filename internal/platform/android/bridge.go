@@ -214,6 +214,19 @@ func StatusBridge() (string, error) {
 	return C.GoString(result), nil
 }
 
+func InstallAPKBridge(path string) error {
+	name := C.CString("installApk")
+	defer C.free(unsafe.Pointer(name))
+	sig := C.CString("(Ljava/lang/String;)V")
+	defer C.free(unsafe.Pointer(sig))
+	arg := C.CString(path)
+	defer C.free(unsafe.Pointer(arg))
+	return withEnv(func(env *C.JNIEnv, ctx C.jobject) error {
+		C.and_call_void_str(env, ctx, name, sig, arg)
+		return nil
+	})
+}
+
 func OpenURLBridge(url string) error {
 	name := C.CString("openUrl")
 	defer C.free(unsafe.Pointer(name))

@@ -109,6 +109,7 @@ func NewManager(version string, autoStart bool) (*Manager, error) {
 			go m.onProxyExitCallback()
 		}
 	})
+	m.proxy.SetOnDegraded(func() { go m.onProxyDegraded() })
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	m.refreshProbe(ctx)
 	cancel()
@@ -164,6 +165,41 @@ func (m *Manager) refreshProbe(ctx context.Context) core.Probe {
 	m.probe = p
 	m.mu.Unlock()
 	return p
+}
+
+func (m *Manager) onProxyDegraded() {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	m.mu.Lock()
+	shuttingDown := m.shuttingDown
+	m.mu.Unlock()
+	if shuttingDown || !m.proxy.Running() {
+		return
+	}
+	now := time.Now()
+	recent := m.proxyRestarts[:0]
+	for _, t := range m.proxyRestarts {
+		if now.Sub(t) < 10*time.Minute {
+			recent = append(recent, t)
+		}
+	}
+	m.proxyRestarts = recent
+	if len(m.proxyRestarts) >= 3 {
+		m.setProxyError("Telegram Proxy деградировал; лимит автоперезапусков исчерпан")
+		return
+	}
+	m.proxyRestarts = append(m.proxyRestarts, now)
+	_ = m.proxy.Stop()
+	cfg := m.store.Snapshot()
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	if err := m.proxy.Start(ctx, cfg.Proxy, m.store.Secret()); err != nil {
+		m.setProxyError("Не удалось перезапустить Telegram Proxy: " + err.Error())
+		return
+	}
+	m.setProxyError("")
+	m.logger.Warn("Telegram proxy restarted after health degradation")
+	m.emitState()
 }
 
 func (m *Manager) onProxyExitCallback() {
@@ -264,7 +300,12 @@ func (m *Manager) state() State {
 	proxyRunning := m.proxy.Running()
 	proxyState := ModuleState{Kind: "stopped", Label: "Выключен", Detail: "Прокси не запущен"}
 	if proxyRunning {
-		proxyState = ModuleState{Kind: "running", Label: "Запущен", Detail: fmt.Sprintf("%s:%d принимает TCP", cfg.Proxy.Host, cfg.Proxy.Port), PID: m.proxy.PID(), Since: m.proxy.StartedAt()}
+		proxyState = ModuleState{Kind: "running", Label: "Запущен", Detail: fmt.Sprintf("%s:%d принимает TCP", cfg.Proxy.Host, cfg.Proxy.Port), PID: m.proxy.PID(), Since: m.proxy.StartedAt(), LatencyMS: m.proxy.LatencyMS(), Healthy: m.proxy.Healthy()}
+		if proxyState.Healthy && proxyState.LatencyMS > 0 {
+			proxyState.Detail = fmt.Sprintf("работает · %d мс", proxyState.LatencyMS)
+		} else if !proxyState.Healthy {
+			proxyState.Detail = "работает, маршрут пока не подтверждён"
+		}
 		if proxyErr != "" {
 			proxyState.Detail += " · " + proxyErr
 		}

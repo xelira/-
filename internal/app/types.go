@@ -16,6 +16,8 @@ type ModuleState struct {
 	PID           int       `json:"pid"`
 	Since         time.Time `json:"since"`
 	EngineVersion string    `json:"engineVersion,omitempty"`
+	LatencyMS     int       `json:"latencyMs,omitempty"`
+	Healthy       bool      `json:"healthy,omitempty"`
 }
 
 type OverallState struct {

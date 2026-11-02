@@ -22,10 +22,11 @@ import (
 
 	andapp "ampersand/internal/app"
 	"ampersand/internal/platform"
+	"ampersand/internal/singleinstance"
 	"ampersand/internal/update"
 )
 
-var Version = "2.2.3-obt"
+var Version = "2.2.4-obt"
 
 //go:embed fonts/*.ttf
 var fontFS embed.FS
@@ -220,12 +221,15 @@ type ui struct {
 	guideNext    *widget.Button
 	guidePos     int
 	mobile       bool
+	trayReady    bool
 
 	listsDomains, listsIPs               *widget.Entry
 	listsDomainsBuiltin, listsIPsBuiltin *widget.Label
 	listsDomainsCount, listsIPsCount     *canvas.Text
+	ping, versionText                    *canvas.Text
 	updateBtn                            *widget.Button
 	updateURL                            string
+	updateLatest                         string
 	autostart                            *widget.Button
 }
 
@@ -238,6 +242,10 @@ func main() {
 		if arg == "--hidden" {
 			hidden = true
 		}
+	}
+	if !singleinstance.Acquire() {
+		fmt.Fprintln(os.Stderr, "& уже запущен")
+		return
 	}
 	a := fyneapp.NewWithID("com.and.network")
 	a.Settings().SetTheme(monoTheme{})
@@ -340,6 +348,10 @@ func (u *ui) build() {
 	// Telegram page.
 	u.link = text(proxyAddress(u.m), linkSize, white, true)
 	u.link.TextStyle.Monospace = true
+	u.ping = text("ПИНГ: —", 12, gray, true)
+	u.ping.TextStyle.Monospace = true
+	u.versionText = text("ВЕРСИЯ: "+Version, 10, dim, true)
+	u.versionText.TextStyle.Monospace = true
 	u.tgToggle = widget.NewButtonWithIcon("ВКЛЮЧИТЬ", darkIcon(iconTelegram), func() { go u.toggleProxy() })
 	u.tgToggle.Importance = widget.HighImportance
 	u.copyBtn = widget.NewButtonWithIcon("КОПИРОВАТЬ", lightIcon(iconCopy), func() {
@@ -355,7 +367,13 @@ func (u *ui) build() {
 		container.NewVBox(label("ЛОКАЛЬНЫЙ АДРЕС", true), separator()),
 		container.NewVBox(separator(), tgActions),
 		nil, nil,
-		container.NewCenter(u.link),
+		container.NewVBox(
+			container.NewCenter(u.link),
+			spacer(8),
+			container.NewCenter(u.ping),
+			spacer(4),
+			container.NewCenter(u.versionText),
+		),
 	))
 
 	// Web / hosts page. Android build has no WEB tab at all.
@@ -511,12 +529,27 @@ func (u *ui) saveLists() {
 
 func (u *ui) updateAction() {
 	if u.updateURL != "" {
+		if runtime.GOOS == "android" {
+			go u.downloadUpdate()
+			return
+		}
 		if err := platform.OpenURL(u.updateURL); err != nil {
 			u.fail(err.Error())
 		}
 		return
 	}
 	go u.checkUpdates(false)
+}
+
+func (u *ui) downloadUpdate() {
+	res := u.m.DownloadAndInstallUpdate()
+	fyne.Do(func() {
+		if res.OK {
+			dialog.ShowInformation("&", res.Message, u.w)
+		} else {
+			dialog.ShowError(errors.New(res.Message), u.w)
+		}
+	})
 }
 
 func (u *ui) checkUpdates(silent bool) {
@@ -532,6 +565,11 @@ func (u *ui) checkUpdates(silent bool) {
 	if info.Available {
 		fyne.Do(func() {
 			u.updateURL = info.URL
+			u.updateLatest = info.Latest
+			if u.versionText != nil {
+				u.versionText.Text = "ВЕРСИЯ: " + info.Current + " · ДОСТУПНА " + info.Latest
+				u.versionText.Refresh()
+			}
 			u.updateBtn.SetText("v" + info.Latest)
 			u.updateBtn.Refresh()
 			if !silent {
@@ -720,12 +758,19 @@ func (u *ui) refresh() {
 	}
 	u.startDPI.Refresh()
 	if st.Proxy.Kind == "running" {
+		if st.Proxy.Healthy && st.Proxy.LatencyMS > 0 {
+			u.ping.Text = fmt.Sprintf("ПИНГ: %d мс", st.Proxy.LatencyMS)
+		} else {
+			u.ping.Text = "ПИНГ: проверка маршрута…"
+		}
 		u.tgToggle.SetText("ВЫКЛЮЧИТЬ")
 		u.tgToggle.Icon = darkIcon(iconStop)
 	} else {
 		u.tgToggle.SetText("ВКЛЮЧИТЬ")
 		u.tgToggle.Icon = darkIcon(iconTelegram)
+		u.ping.Text = "ПИНГ: —"
 	}
+	u.ping.Refresh()
 	u.tgToggle.Refresh()
 	if st.Busy {
 		u.main.SetText("РАБОТАЮ…")

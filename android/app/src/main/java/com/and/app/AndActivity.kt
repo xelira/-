@@ -22,6 +22,7 @@ class AndActivity : GoNativeActivity() {
     fun stopDpi() { Log.d("AndDpi", "JNI stopDpi"); DpiBridge.stop(this) }
     fun isDpiRunning(): Boolean = DpiBridge.isRunning(this)
     fun dpiStatus(): String = DpiBridge.status(this)
+    fun installApk(path: String) = DpiBridge.installApk(this, path)
     fun openUrl(url: String) = DpiBridge.openUrl(this, url)
     fun keepAlive(enabled: Boolean) = DpiBridge.keepAlive(this, enabled)
     fun requestPermissions() = DpiBridge.requestPermissions()
