@@ -3,6 +3,10 @@
 package main
 
 import (
+	"os/exec"
+	"runtime"
+	"strings"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
@@ -181,7 +185,25 @@ func (u *ui) setupWindow() {
 	u.setupTray()
 }
 
+func traySupported() bool {
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	if _, err := exec.LookPath("dbus-send"); err != nil {
+		return false
+	}
+	out, err := exec.Command(
+		"dbus-send", "--session", "--dest=org.freedesktop.DBus", "--print-reply",
+		"/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner",
+		"string:org.kde.StatusNotifierWatcher",
+	).Output()
+	return err == nil && strings.Contains(string(out), "boolean true")
+}
+
 func (u *ui) setupTray() {
+	if !traySupported() {
+		return
+	}
 	app, ok := u.app.(desktop.App)
 	if !ok {
 		return
